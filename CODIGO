@@ -1,0 +1,143 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <ctype.h>
+
+#define MAX_VAL 255
+
+// Função para ordenar um array
+void ordenar(int *arr, int tamanho) {
+    for (int i = 0; i < tamanho - 1; i++) {
+        for (int j = i + 1; j < tamanho; j++) {
+            if (arr[i] > arr[j]) {
+                int temp = arr[i];
+                arr[i] = arr[j];
+                arr[j] = temp;
+            }
+        }
+    }
+}
+
+// Função para aplicar o filtro de mediana
+void filtro_mediana(int **imagem, int largura, int altura) {
+    int filtro_tamanho = 3;  // Tamanho do filtro 3x3
+    int meio = filtro_tamanho * filtro_tamanho / 2;
+
+    // Percorre cada pixel da imagem
+    for (int i = 1; i < altura - 1; i++) {
+        for (int j = 1; j < largura - 1; j++) {
+            int vizinhos[filtro_tamanho * filtro_tamanho];
+            int k = 0;
+
+            // Coleta os valores dos pixels ao redor
+            for (int x = -1; x <= 1; x++) {
+                for (int y = -1; y <= 1; y++) {
+                    if (i + x >= 0 && i + x < altura && j + y >= 0 && j + y < largura) {
+                        vizinhos[k++] = imagem[i + x][j + y];
+                    }
+                }
+            }
+
+            // Ordena os valores dos vizinhos e pega a mediana
+            ordenar(vizinhos, filtro_tamanho * filtro_tamanho);
+            imagem[i][j] = vizinhos[meio];
+        }
+    }
+
+    // Corrige as bordas, sem aplicar o filtro
+    for (int i = 0; i < altura; i++) {
+        imagem[i][0] = imagem[i][1];  // Borda esquerda
+        imagem[i][largura - 1] = imagem[i][largura - 2];  // Borda direita
+    }
+    for (int j = 0; j < largura; j++) {
+        imagem[0][j] = imagem[1][j];  // Borda superior
+        imagem[altura - 1][j] = imagem[altura - 2][j];  // Borda inferior
+    }
+}
+
+// Função para ler a imagem PGM
+int** ler_imagem(const char *nome_arquivo, int *largura, int *altura) {
+    FILE *arquivo = fopen(nome_arquivo, "r");
+    if (!arquivo) {
+        printf("Erro ao abrir a imagem.\n");
+        return NULL;
+    }
+
+    char formato[3];
+    fscanf(arquivo, "%s", formato);
+    if (formato[0] != 'P' || formato[1] != '2') {
+        printf("Formato incorreto. O arquivo deve ser um PGM no formato P2.\n");
+        fclose(arquivo);
+        return NULL;
+    }
+
+    // Ignorar linhas de comentário
+    char c;
+    do {
+        c = fgetc(arquivo);
+    } while (c == '#');
+    ungetc(c, arquivo);
+
+    fscanf(arquivo, "%d %d", largura, altura);  // Lê as dimensões
+    int max_val;
+    fscanf(arquivo, "%d", &max_val);  // Lê o valor máximo dos pixels
+
+    // Aloca memória para a matriz da imagem
+    int **imagem = (int **)malloc(*altura * sizeof(int *));
+    for (int i = 0; i < *altura; i++) {
+        imagem[i] = (int *)malloc(*largura * sizeof(int));
+    }
+
+    // Lê os valores dos pixels da imagem
+    for (int i = 0; i < *altura; i++) {
+        for (int j = 0; j < *largura; j++) {
+            fscanf(arquivo, "%d", &imagem[i][j]);
+        }
+    }
+
+    fclose(arquivo);
+    return imagem;
+}
+
+// Função para salvar a imagem após filtro
+void salvar_imagem(const char *nome_arquivo, int **imagem, int largura, int altura) {
+    FILE *arquivo = fopen(nome_arquivo, "w");
+    if (!arquivo) {
+        printf("Erro ao salvar a imagem.\n");
+        return;
+    }
+
+    fprintf(arquivo, "P2\n");  // Escreve o cabeçalho PGM
+    fprintf(arquivo, "%d %d\n", largura, altura);
+    fprintf(arquivo, "255\n");
+
+    // Escreve os valores dos pixels
+    for (int i = 0; i < altura; i++) {
+        for (int j = 0; j < largura; j++) {
+            fprintf(arquivo, "%d ", imagem[i][j]);
+        }
+        fprintf(arquivo, "\n");
+    }
+
+    fclose(arquivo);
+}
+
+// Função principal
+int main() {
+    int largura, altura;
+    int **imagem = ler_imagem("small_einstein.pgm", &largura, &altura);
+    if (imagem == NULL) {
+        return 1;
+    }
+
+    filtro_mediana(imagem, largura, altura);
+    salvar_imagem("imagem_filtada.pgm", imagem, largura, altura);
+
+    // Libera a memória
+    for (int i = 0; i < altura; i++) {
+        free(imagem[i]);
+    }
+    free(imagem);
+
+    printf("Filtro de mediana aplicado com sucesso!\n");
+    return 0;
+}
